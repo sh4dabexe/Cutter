@@ -28,26 +28,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
         }
       });
 
       if (error) {
-        if (error.message.includes('provider is not enabled') || error.message.includes('validation_failed')) {
-          throw new Error('Google Provider is disabled in Supabase. Please enable Google in Supabase Dashboard (Auth -> Providers -> Google).');
-        }
-        throw error;
+        console.error('Supabase OAuth Error details:', error);
+        throw new Error(error.message || `Error ${error.status}: Failed to initiate Google Auth`);
       }
 
       if (data?.url) {
         window.location.href = data.url;
+      } else {
+        throw new Error('Supabase did not return a redirect URL for Google login.');
       }
     } catch (err: any) {
       console.error('Google Auth Error:', err);
-      setErrorMsg(err.message || 'Google Auth failed to launch');
+      setErrorMsg(err.message || String(err));
     } finally {
       setLoading(false);
     }

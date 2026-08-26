@@ -153,16 +153,17 @@ export async function recordClick(shortCode: string): Promise<string | null> {
 
     if (!error && data) {
       targetUrl = data.original_url;
-      const currentClicks = (data.clicks || 0) + 1;
+      const newClicks = (data.clicks || 0) + 1;
 
-      // 2. Try calling RPC function or direct UPDATE for click count
-      try {
+      // 2. Perform direct UPDATE for click count in Supabase
+      const { error: updateErr } = await supabase
+        .from('urls')
+        .update({ clicks: newClicks })
+        .eq('id', data.id);
+
+      if (updateErr) {
+        console.warn('Direct click update warning:', updateErr.message);
         await supabase.rpc('increment_url_clicks', { target_short_code: data.short_code });
-      } catch {
-        await supabase
-          .from('urls')
-          .update({ clicks: currentClicks })
-          .eq('id', data.id);
       }
 
       // 3. Log analytics click event
@@ -179,7 +180,7 @@ export async function recordClick(shortCode: string): Promise<string | null> {
 
       // Update local copy if matched
       if (localMatch) {
-        localMatch.clicks = currentClicks;
+        localMatch.clicks = newClicks;
         saveLocalURL(localMatch);
       }
     }

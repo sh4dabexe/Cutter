@@ -136,6 +136,25 @@ export async function fetchUserURLs(userId?: string | null): Promise<ShortenedUR
   return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
+export async function deleteShortURL(id: string, shortCode: string): Promise<boolean> {
+  // 1. Remove from local storage
+  const localURLs = getLocalURLs();
+  const updatedLocal = localURLs.filter(u => u.short_code.toLowerCase() !== shortCode.toLowerCase() && u.id !== id);
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocal));
+
+  // 2. Remove from Supabase
+  try {
+    await supabase
+      .from('urls')
+      .delete()
+      .or(`id.eq.${id},short_code.eq.${shortCode}`);
+  } catch (err) {
+    console.warn('Supabase delete warning:', err);
+  }
+
+  return true;
+}
+
 export async function recordClick(shortCode: string): Promise<string | null> {
   const cleanCode = shortCode.trim();
   const localURLs = getLocalURLs();

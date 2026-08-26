@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Link2, ExternalLink, Copy, Check, BarChart2, QrCode, Search, RefreshCw } from 'lucide-react';
+import { X, Link2, ExternalLink, Copy, Check, BarChart2, QrCode, Search, RefreshCw, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { fetchUserURLs, ShortenedURL } from '../lib/supabase';
+import { fetchUserURLs, deleteShortURL, ShortenedURL } from '../lib/supabase';
 
 interface DashboardModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({ isOpen, onClose,
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeQrCode, setActiveQrCode] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -43,6 +44,20 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({ isOpen, onClose,
     navigator.clipboard.writeText(getFullShortLink(code));
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDelete = async (id: string, shortCode: string) => {
+    if (!window.confirm(`Are you sure you want to delete short link "${shortCode}"?`)) return;
+
+    setDeletingId(id);
+    try {
+      await deleteShortURL(id, shortCode);
+      setUrls(prev => prev.filter(item => item.id !== id && item.short_code !== shortCode));
+    } catch (err) {
+      console.error('Failed to delete URL:', err);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filteredUrls = urls.filter(u =>
@@ -179,6 +194,19 @@ export const DashboardModal: React.FC<DashboardModalProps> = ({ isOpen, onClose,
                         title="QR Code"
                       >
                         <QrCode className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(item.id, item.short_code)}
+                        disabled={deletingId === item.id}
+                        className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                        title="Delete short link"
+                      >
+                        {deletingId === item.id ? (
+                          <div className="w-3.5 h-3.5 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
 

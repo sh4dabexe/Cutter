@@ -47,7 +47,7 @@ export function getLocalURLs(): ShortenedURL[] {
 
 export function saveLocalURL(urlRecord: ShortenedURL) {
   const existing = getLocalURLs();
-  const updated = [urlRecord, ...existing.filter(u => u.short_code !== urlRecord.short_code)];
+  const updated = [urlRecord, ...existing.filter(u => u.short_code.toLowerCase() !== urlRecord.short_code.toLowerCase())];
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 }
 
@@ -67,6 +67,36 @@ export async function createShortURL(originalUrl: string, customAlias?: string, 
     title = target;
   }
 
+  const payload: any = {
+    short_code,
+    original_url: target,
+    title,
+    clicks: 0
+  };
+  if (userId) {
+    payload.user_id = userId;
+  }
+
+  // Try Supabase insert
+  try {
+    const { data, error } = await supabase
+      .from('urls')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase DB Insert Error:', error.message);
+    }
+
+    if (!error && data) {
+      saveLocalURL(data);
+      return data as ShortenedURL;
+    }
+  } catch (err) {
+    console.warn('Supabase DB insert exception:', err);
+  }
+
   const newRecord: ShortenedURL = {
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
     short_code,
@@ -76,28 +106,6 @@ export async function createShortURL(originalUrl: string, customAlias?: string, 
     created_at: new Date().toISOString(),
     user_id: userId || null
   };
-
-  // Try Supabase insert
-  try {
-    const { data, error } = await supabase
-      .from('urls')
-      .insert([{
-        short_code,
-        original_url: target,
-        title,
-        clicks: 0,
-        user_id: userId || null
-      }])
-      .select()
-      .single();
-
-    if (!error && data) {
-      saveLocalURL(data);
-      return data as ShortenedURL;
-    }
-  } catch (err) {
-    console.warn('Supabase DB insert error, fallback to local store:', err);
-  }
 
   // Fallback to local
   saveLocalURL(newRecord);
@@ -122,24 +130,26 @@ export async function fetchUserURLs(userId?: string | null): Promise<ShortenedUR
   const localURLs = getLocalURLs();
   // Merge remote and local without duplicates
   const map = new Map<string, ShortenedURL>();
-  localURLs.forEach(item => map.set(item.short_code, item));
-  remoteURLs.forEach(item => map.set(item.short_code, item));
+  localURLs.forEach(item => map.set(item.short_code.toLowerCase(), item));
+  remoteURLs.forEach(item => map.set(item.short_code.toLowerCase(), item));
 
   return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export async function recordClick(shortCode: string): Promise<string | null> {
+  const cleanCode = shortCode.trim();
   const localURLs = getLocalURLs();
-  const localMatch = localURLs.find(u => u.short_code === shortCode);
+  const localMatch = localURLs.find(u => u.short_code.toLowerCase() === cleanCode.toLowerCase());
   let targetUrl: string | null = localMatch?.original_url || null;
 
   try {
-    // 1. Fetch short URL details from Supabase
+    // 1. Fetch short URL details from Supabase (case-insensitive)
     const { data, error } = await supabase
       .from('urls')
       .select('*')
-      .eq('short_code', shortCode)
-      .single();
+      .ilike('short_code', cleanCode)
+      .limit(1)
+      .maybeSingle();
 
     if (!error && data) {
       targetUrl = data.original_url;
@@ -147,7 +157,7 @@ export async function recordClick(shortCode: string): Promise<string | null> {
 
       // 2. Try calling RPC function or direct UPDATE for click count
       try {
-        await supabase.rpc('increment_url_clicks', { target_short_code: shortCode });
+        await supabase.rpc('increment_url_clicks', { target_short_code: data.short_code });
       } catch {
         await supabase
           .from('urls')

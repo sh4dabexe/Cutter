@@ -8,15 +8,18 @@ export const RedirectHandler: React.FC = () => {
   useEffect(() => {
     const handleRedirect = async () => {
       const hash = window.location.hash;
+      const pathname = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
       let shortCode: string | null = null;
 
       if (hash.startsWith('#/s/')) {
-        shortCode = hash.replace('#/s/', '').split('?')[0];
+        shortCode = hash.replace('#/s/', '').split('?')[0].split('/')[0].trim();
+      } else if (pathname.startsWith('/s/')) {
+        shortCode = pathname.replace('/s/', '').split('?')[0].split('/')[0].trim();
       } else if (params.has('s')) {
-        shortCode = params.get('s');
+        shortCode = params.get('s')?.trim() || null;
       } else if (params.has('short')) {
-        shortCode = params.get('short');
+        shortCode = params.get('short')?.trim() || null;
       }
 
       // Do not treat Supabase OAuth ?code= as a short code
@@ -37,16 +40,17 @@ export const RedirectHandler: React.FC = () => {
 
     handleRedirect();
 
-    // Also listen for dynamic hash changes while on the page
+    // Also listen for dynamic hash/url changes while on the page
     window.addEventListener('hashchange', handleRedirect);
     return () => window.removeEventListener('hashchange', handleRedirect);
   }, []);
 
   const hash = window.location.hash;
+  const pathname = window.location.pathname;
   const params = new URLSearchParams(window.location.search);
 
   // Exclude Supabase Auth OAuth callbacks (which use ?code= or #access_token=)
-  const isShortLinkRoute = hash.startsWith('#/s/') || params.has('s') || params.has('short');
+  const isShortLinkRoute = hash.startsWith('#/s/') || pathname.startsWith('/s/') || params.has('s') || params.has('short');
 
   if (!isShortLinkRoute) return null;
 
@@ -60,7 +64,7 @@ export const RedirectHandler: React.FC = () => {
             <p className="text-xs text-muted-foreground mb-6">{error}</p>
             <a
               href="/"
-              onClick={() => { window.location.hash = ''; window.location.reload(); }}
+              onClick={() => { window.location.hash = ''; window.location.pathname = '/'; }}
               className="bg-white text-black text-xs font-semibold px-5 py-2.5 rounded-lg hover:bg-white/90 transition-colors"
             >
               Return to Cutter Home

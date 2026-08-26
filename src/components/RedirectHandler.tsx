@@ -8,15 +8,18 @@ export const RedirectHandler: React.FC = () => {
   useEffect(() => {
     const handleRedirect = async () => {
       const hash = window.location.hash;
+      const params = new URLSearchParams(window.location.search);
       let shortCode: string | null = null;
 
       if (hash.startsWith('#/s/')) {
         shortCode = hash.replace('#/s/', '').split('?')[0];
-      } else {
-        const params = new URLSearchParams(window.location.search);
-        shortCode = params.get('s') || params.get('code');
+      } else if (params.has('s')) {
+        shortCode = params.get('s');
+      } else if (params.has('short')) {
+        shortCode = params.get('short');
       }
 
+      // Do not treat Supabase OAuth ?code= as a short code
       if (!shortCode) return;
 
       try {
@@ -36,9 +39,11 @@ export const RedirectHandler: React.FC = () => {
 
   const hash = window.location.hash;
   const params = new URLSearchParams(window.location.search);
-  const isRedirectRoute = hash.startsWith('#/s/') || params.has('s') || params.has('code');
 
-  if (!isRedirectRoute) return null;
+  // Exclude Supabase Auth OAuth callbacks (which use ?code= or #access_token=)
+  const isShortLinkRoute = hash.startsWith('#/s/') || params.has('s') || params.has('short');
+
+  if (!isShortLinkRoute) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white p-6">

@@ -25,9 +25,10 @@ export const RedirectHandler: React.FC = () => {
       try {
         const targetUrl = await recordClick(shortCode);
         if (targetUrl) {
-          window.location.href = targetUrl;
+          // Redirect immediately to target URL
+          window.location.replace(targetUrl);
         } else {
-          setError(`Short link "${shortCode}" was not found or has expired.`);
+          setError(`Short link "${shortCode}" was not found in database or has expired.`);
         }
       } catch (err) {
         setError('Error resolving short link redirect.');
@@ -35,6 +36,10 @@ export const RedirectHandler: React.FC = () => {
     };
 
     handleRedirect();
+
+    // Also listen for dynamic hash changes while on the page
+    window.addEventListener('hashchange', handleRedirect);
+    return () => window.removeEventListener('hashchange', handleRedirect);
   }, []);
 
   const hash = window.location.hash;
@@ -55,6 +60,7 @@ export const RedirectHandler: React.FC = () => {
             <p className="text-xs text-muted-foreground mb-6">{error}</p>
             <a
               href="/"
+              onClick={() => { window.location.hash = ''; window.location.reload(); }}
               className="bg-white text-black text-xs font-semibold px-5 py-2.5 rounded-lg hover:bg-white/90 transition-colors"
             >
               Return to Cutter Home

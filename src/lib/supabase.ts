@@ -35,7 +35,6 @@ export function generateShortCode(length = 6): string {
 
 // Local storage helper key
 const LOCAL_STORAGE_KEY = 'cutter_local_urls';
-const LOCAL_ANALYTICS_KEY = 'cutter_local_analytics';
 
 export function getLocalURLs(): ShortenedURL[] {
   try {
@@ -48,7 +47,7 @@ export function getLocalURLs(): ShortenedURL[] {
 
 export function saveLocalURL(urlRecord: ShortenedURL) {
   const existing = getLocalURLs();
-  const updated = [urlRecord, ...existing.filter(u => u.id !== urlRecord.id)];
+  const updated = [urlRecord, ...existing.filter(u => u.short_code !== urlRecord.short_code)];
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 }
 
@@ -61,7 +60,12 @@ export async function createShortURL(originalUrl: string, customAlias?: string, 
   }
 
   const short_code = customAlias && customAlias.trim() ? customAlias.trim() : generateShortCode(6);
-  const title = new URL(target).hostname.replace('www.', '');
+  let title = 'Shortened Link';
+  try {
+    title = new URL(target).hostname.replace('www.', '');
+  } catch {
+    title = target;
+  }
 
   const newRecord: ShortenedURL = {
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
@@ -73,7 +77,7 @@ export async function createShortURL(originalUrl: string, customAlias?: string, 
     user_id: userId || null
   };
 
-  // Try Supabase first
+  // Try Supabase insert
   try {
     const { data, error } = await supabase
       .from('urls')
@@ -92,7 +96,7 @@ export async function createShortURL(originalUrl: string, customAlias?: string, 
       return data as ShortenedURL;
     }
   } catch (err) {
-    console.warn('Supabase DB offline or unconfigured, using local store:', err);
+    console.warn('Supabase DB insert error, fallback to local store:', err);
   }
 
   // Fallback to local
@@ -127,11 +131,10 @@ export async function fetchUserURLs(userId?: string | null): Promise<ShortenedUR
 export async function recordClick(shortCode: string): Promise<string | null> {
   const localURLs = getLocalURLs();
   const localMatch = localURLs.find(u => u.short_code === shortCode);
-
-  let targetUrl = localMatch?.original_url || null;
-  let urlId = localMatch?.id || null;
+  let targetUrl: string | null = localMatch?.original_url || null;
 
   try {
+    // 1. Fetch short URL details from Supabase
     const { data, error } = await supabase
       .from('urls')
       .select('*')
@@ -140,30 +143,45 @@ export async function recordClick(shortCode: string): Promise<string | null> {
 
     if (!error && data) {
       targetUrl = data.original_url;
-      urlId = data.id;
+      const currentClicks = (data.clicks || 0) + 1;
 
-      // Increment click count in Supabase
-      await supabase
-        .from('urls')
-        .update({ clicks: (data.clicks || 0) + 1 })
-        .eq('id', data.id);
+      // 2. Try calling RPC function or direct UPDATE for click count
+      try {
+        await supabase.rpc('increment_url_clicks', { target_short_code: shortCode });
+      } catch {
+        await supabase
+          .from('urls')
+          .update({ clicks: currentClicks })
+          .eq('id', data.id);
+      }
 
-      // Log click analytics event
-      await supabase.from('url_analytics').insert([{
-        url_id: data.id,
-        referrer: document.referrer || 'Direct / Social',
-        user_agent: navigator.userAgent,
-        country: 'Global'
-      }]);
+      // 3. Log analytics click event
+      try {
+        await supabase.from('url_analytics').insert([{
+          url_id: data.id,
+          referrer: document.referrer || 'Direct / Social',
+          user_agent: navigator.userAgent,
+          country: 'Global'
+        }]);
+      } catch (analyticsErr) {
+        console.warn('Analytics log warning:', analyticsErr);
+      }
+
+      // Update local copy if matched
+      if (localMatch) {
+        localMatch.clicks = currentClicks;
+        saveLocalURL(localMatch);
+      }
     }
   } catch (err) {
-    console.warn('Supabase analytics update failed:', err);
+    console.warn('Supabase recordClick warning:', err);
   }
 
-  // Update local storage click counter
-  if (localMatch) {
+  // If local match exists, increment local counter as well
+  if (localMatch && !targetUrl) {
     localMatch.clicks = (localMatch.clicks || 0) + 1;
     saveLocalURL(localMatch);
+    targetUrl = localMatch.original_url;
   }
 
   return targetUrl;

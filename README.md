@@ -40,7 +40,7 @@
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/shadabalam3506/Cutter.git
+   git clone https://github.com/sh4dabexe/Cutter.git
    cd Cutter
    ```
 

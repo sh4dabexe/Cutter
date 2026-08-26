@@ -28,7 +28,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           redirectTo: window.location.origin
         }
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('provider is not enabled') || error.message.includes('validation_failed')) {
+          throw new Error('Google Sign-In is not enabled in Supabase yet. Please sign in using Email & Password or enable Google Provider in your Supabase Dashboard.');
+        }
+        throw error;
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Google Auth failed');
     } finally {

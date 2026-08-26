@@ -137,19 +137,26 @@ export async function fetchUserURLs(userId?: string | null): Promise<ShortenedUR
 }
 
 export async function deleteShortURL(id: string, shortCode: string): Promise<boolean> {
-  // 1. Remove from local storage
+  const cleanCode = shortCode.trim();
+
+  // 1. Remove from local storage immediately
   const localURLs = getLocalURLs();
-  const updatedLocal = localURLs.filter(u => u.short_code.toLowerCase() !== shortCode.toLowerCase() && u.id !== id);
+  const updatedLocal = localURLs.filter(u => u.short_code.toLowerCase() !== cleanCode.toLowerCase() && u.id !== id);
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocal));
 
-  // 2. Remove from Supabase
+  // 2. Remove from Supabase database
   try {
-    await supabase
+    const { error } = await supabase
       .from('urls')
       .delete()
-      .or(`id.eq.${id},short_code.eq.${shortCode}`);
+      .eq('short_code', cleanCode);
+
+    if (error) {
+      console.warn('Supabase delete by short_code error:', error.message);
+      await supabase.from('urls').delete().eq('id', id);
+    }
   } catch (err) {
-    console.warn('Supabase delete warning:', err);
+    console.warn('Supabase delete exception:', err);
   }
 
   return true;
@@ -157,9 +164,6 @@ export async function deleteShortURL(id: string, shortCode: string): Promise<boo
 
 export async function recordClick(shortCode: string): Promise<string | null> {
   const cleanCode = shortCode.trim();
-  const localURLs = getLocalURLs();
-  const localMatch = localURLs.find(u => u.short_code.toLowerCase() === cleanCode.toLowerCase());
-  let targetUrl: string | null = localMatch?.original_url || null;
 
   try {
     // 1. Fetch short URL details from Supabase (case-insensitive)
@@ -171,7 +175,7 @@ export async function recordClick(shortCode: string): Promise<string | null> {
       .maybeSingle();
 
     if (!error && data) {
-      targetUrl = data.original_url;
+      const targetUrl = data.original_url;
       const newClicks = (data.clicks || 0) + 1;
 
       // 2. Perform direct UPDATE for click count in Supabase
@@ -197,22 +201,31 @@ export async function recordClick(shortCode: string): Promise<string | null> {
         console.warn('Analytics log warning:', analyticsErr);
       }
 
-      // Update local copy if matched
+      // Sync local copy if matched
+      const localURLs = getLocalURLs();
+      const localMatch = localURLs.find(u => u.short_code.toLowerCase() === cleanCode.toLowerCase());
       if (localMatch) {
         localMatch.clicks = newClicks;
         saveLocalURL(localMatch);
       }
+
+      return targetUrl;
+    }
+
+    if (!error && !data) {
+      // Record was explicitly deleted or does not exist in Supabase!
+      // Purge from local storage if it was deleted
+      const localURLs = getLocalURLs();
+      const updatedLocal = localURLs.filter(u => u.short_code.toLowerCase() !== cleanCode.toLowerCase());
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLocal));
+      return null;
     }
   } catch (err) {
     console.warn('Supabase recordClick warning:', err);
   }
 
-  // If local match exists, increment local counter as well
-  if (localMatch && !targetUrl) {
-    localMatch.clicks = (localMatch.clicks || 0) + 1;
-    saveLocalURL(localMatch);
-    targetUrl = localMatch.original_url;
-  }
-
-  return targetUrl;
+  // Only fallback to local storage if Supabase was offline / failed to connect
+  const localURLs = getLocalURLs();
+  const localMatch = localURLs.find(u => u.short_code.toLowerCase() === cleanCode.toLowerCase());
+  return localMatch ? localMatch.original_url : null;
 }

@@ -29,13 +29,13 @@ ALTER TABLE public.url_analytics ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public URLs are readable by everyone" ON public.urls FOR SELECT USING (true);
 CREATE POLICY "Anyone can insert short links" ON public.urls FOR INSERT WITH CHECK (true);
 CREATE POLICY "Anyone can update click counts" ON public.urls FOR UPDATE USING (true);
-CREATE POLICY "Users can delete their own links" ON public.urls FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Anyone can delete short links" ON public.urls FOR DELETE USING (true);
 
 -- Policies for Analytics
 CREATE POLICY "Anyone can insert analytics" ON public.url_analytics FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public analytics are viewable" ON public.url_analytics FOR SELECT USING (true);
 
--- Atomic Click Counter Function (Optional for race-condition prevention)
+-- Atomic Click Counter Function
 CREATE OR REPLACE FUNCTION increment_url_clicks(target_short_code TEXT)
 RETURNS VOID AS $$
 BEGIN

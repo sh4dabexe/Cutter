@@ -16,20 +16,20 @@ export const TestimonialSection: React.FC = () => {
     <section
       ref={containerRef}
       id="reviews"
-      className="min-h-screen flex items-center justify-center py-24 md:py-32 px-8 md:px-28 bg-black relative border-t border-white/5"
+      className="min-h-[80vh] flex items-center justify-center py-16 sm:py-24 md:py-32 px-4 sm:px-8 md:px-28 bg-black relative border-t border-white/5"
     >
-      <div className="max-w-3xl mx-auto flex flex-col items-start gap-10">
+      <div className="max-w-3xl mx-auto flex flex-col items-start gap-6 sm:gap-10">
         {/* Quote symbol image */}
-        <div className="w-14 h-10 flex items-center justify-start">
+        <div className="w-10 sm:w-14 h-8 sm:h-10 flex items-center justify-start">
           <img
             src="/quote-symbol.svg"
             alt="Quote Symbol"
-            className="w-14 h-10 object-contain opacity-80"
+            className="w-10 sm:w-14 h-8 sm:h-10 object-contain opacity-80"
           />
         </div>
 
         {/* Scroll-driven word reveal text */}
-        <div className="text-4xl md:text-5xl font-medium leading-[1.2] flex flex-wrap text-white">
+        <div className="text-2xl sm:text-4xl md:text-5xl font-medium leading-[1.3] sm:leading-[1.2] flex flex-wrap text-white">
           {words.map((word, idx) => {
             const start = idx / words.length;
             const end = (idx + 1) / words.length;
@@ -45,27 +45,27 @@ export const TestimonialSection: React.FC = () => {
               <motion.span
                 key={idx}
                 style={{ opacity, color }}
-                className="mr-[0.3em] inline-block transition-colors duration-150"
+                className="mr-[0.25em] inline-block transition-colors duration-150"
               >
                 {word}
               </motion.span>
             );
           })}
-          <span className="text-muted-foreground ml-2">”</span>
+          <span className="text-muted-foreground ml-1.5">”</span>
         </div>
 
         {/* Author Row */}
-        <div className="flex items-center gap-4 mt-2">
+        <div className="flex items-center gap-3.5 mt-2">
           <img
             src="/testimonial-avatar.png"
             alt="Brooklyn Simmons"
-            className="w-14 h-14 rounded-full border-[3px] border-foreground object-cover shadow-lg"
+            className="w-12 sm:w-14 h-12 sm:h-14 rounded-full border-[3px] border-foreground object-cover shadow-lg shrink-0"
           />
           <div className="flex flex-col">
-            <span className="text-base font-semibold leading-7 text-foreground">
+            <span className="text-sm sm:text-base font-semibold leading-snug text-foreground">
               Brooklyn Simmons
             </span>
-            <span className="text-sm font-normal leading-5 text-muted-foreground">
+            <span className="text-xs sm:text-sm font-normal leading-tight text-muted-foreground">
               Product Manager
             </span>
           </div>

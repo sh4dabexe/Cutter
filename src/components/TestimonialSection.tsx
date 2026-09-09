@@ -53,23 +53,6 @@ export const TestimonialSection: React.FC = () => {
           })}
           <span className="text-muted-foreground ml-1.5">”</span>
         </div>
-
-        {/* Author Row */}
-        <div className="flex items-center gap-3.5 mt-2">
-          <img
-            src="/testimonial-avatar.png"
-            alt="Brooklyn Simmons"
-            className="w-12 sm:w-14 h-12 sm:h-14 rounded-full border-[3px] border-foreground object-cover shadow-lg shrink-0"
-          />
-          <div className="flex flex-col">
-            <span className="text-sm sm:text-base font-semibold leading-snug text-foreground">
-              Brooklyn Simmons
-            </span>
-            <span className="text-xs sm:text-sm font-normal leading-tight text-muted-foreground">
-              Product Manager
-            </span>
-          </div>
-        </div>
       </div>
     </section>
   );

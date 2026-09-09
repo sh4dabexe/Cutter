@@ -12,16 +12,54 @@ export function App() {
   const [user, setUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [dashboardModalOpen, setDashboardModalOpen] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for OAuth callback errors in URL query params or hash
+    const queryParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''));
+
+    const errorParam = queryParams.get('error') || hashParams.get('error');
+    const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
+
+    if (errorParam || errorDescription) {
+      let message = errorDescription || errorParam || 'Authentication failed';
+      const lower = message.toLowerCase();
+      if (lower.includes('provider is not enabled') || lower.includes('validation_failed')) {
+        message = 'Google OAuth is disabled in your Supabase Dashboard. Go to Authentication > Providers > Google, enable it, and paste your Google Client ID and Secret.';
+      } else if (lower.includes('access_denied')) {
+        message = 'Google Sign-In was cancelled or denied. If your Google Cloud app is in "Testing" mode, please add your Google account as a Test User in Google Cloud Console.';
+      } else if (lower.includes('redirect_uri_mismatch')) {
+        message = 'Google OAuth redirect URI mismatch. Please verify that your Supabase callback URL (https://<project-ref>.supabase.co/auth/v1/callback) is added to Authorized Redirect URIs in Google Cloud Console.';
+      }
+      setAuthError(message);
+      setAuthModalOpen(true);
+
+      // Clean up URL query parameters without full page reload
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Clean up PKCE ?code= parameter after exchange
+    if (queryParams.has('code')) {
+      setTimeout(() => {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 1000);
+    }
+
     // Get initial Supabase auth user
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
 
     // Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      if (event === 'SIGNED_IN' && session?.user) {
+        setAuthError(null);
+        setNotification(`Welcome back, ${session.user.user_metadata?.full_name || session.user.email || 'user'}!`);
+        setTimeout(() => setNotification(null), 5000);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -30,6 +68,8 @@ export function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setNotification('Successfully signed out.');
+    setTimeout(() => setNotification(null), 4000);
   };
 
   return (
@@ -114,10 +154,22 @@ export function App() {
         </div>
       </footer>
 
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl bg-neutral-900/95 border border-white/20 shadow-2xl backdrop-blur-md text-xs font-medium text-white flex items-center gap-3 animate-fade-in">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{notification}</span>
+        </div>
+      )}
+
       {/* Modals */}
       <AuthModal
         isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setAuthError(null);
+        }}
+        initialError={authError}
         onSuccess={(loggedUser) => {
           setUser(loggedUser);
           setDashboardModalOpen(true);

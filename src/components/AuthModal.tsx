@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, LogIn, UserPlus, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, checkSupabaseHealth, supabaseUrl } from '../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (user: any) => void;
+  initialError?: string | null;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess, initialError }) => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialError || null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (initialError) {
+      setErrorMsg(initialError);
+    }
+  }, [initialError]);
 
   if (!isOpen) return null;
 
@@ -22,22 +29,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     try {
       setLoading(true);
       setErrorMsg(null);
+
+      // Pre-check Supabase endpoint connectivity
+      const health = await checkSupabaseHealth();
+      if (!health.ok) {
+        throw new Error(
+          `Cannot connect to Supabase (${supabaseUrl}). Your project may be PAUSED or DELETED. Please check your Supabase Dashboard to unpause or verify the project URL.`
+        );
+      }
+
       const redirectUrl = window.location.origin;
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         }
       });
 
       if (error) {
         console.error('Supabase OAuth Error details:', error);
-        throw new Error(error.message || `Error ${error.status}: Failed to initiate Google Auth`);
+        if (error.message.toLowerCase().includes('provider is not enabled') || error.message.toLowerCase().includes('validation_failed')) {
+          throw new Error('Google Provider is disabled in your Supabase Dashboard. Enable it under Authentication > Providers > Google.');
+        }
+        throw new Error(error.message || `Failed to initiate Google Auth: ${error.status}`);
       }
 
       if (data?.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       } else {
         throw new Error('Supabase did not return a redirect URL for Google login.');
       }

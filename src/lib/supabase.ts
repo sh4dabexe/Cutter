@@ -1,9 +1,39 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vgnsrptmlypzghpnguoc.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnbnNycHRtbHlwemdocG5ndW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTI0NjcsImV4cCI6MjEwMTU4ODQ2N30.lQwtckilbDTpZGgPktappnJviIPDhfIa57qBXgGavx0';
+export const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://vgnsrptmlypzghpnguoc.supabase.co').replace(/\/+$/, '');
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnbnNycHRtbHlwemdocG5ndW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTI0NjcsImV4cCI6MjEwMTU4ODQ2N30.lQwtckilbDTpZGgPktappnJviIPDhfIa57qBXgGavx0';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  }
+});
+
+export async function checkSupabaseHealth(): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      headers: { apikey: supabaseAnonKey },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (res.ok || res.status === 200) {
+      return { ok: true };
+    }
+    return { ok: true, message: `Status: ${res.status}` };
+  } catch (err: any) {
+    return {
+      ok: false,
+      message: err.name === 'AbortError'
+        ? 'Connection timed out. Supabase server is not responding.'
+        : 'Unable to connect to Supabase. The project may be paused, inactive, or the project URL is incorrect.'
+    };
+  }
+}
 
 export interface ShortenedURL {
   id: string;

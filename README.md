@@ -91,6 +91,50 @@ CREATE TABLE IF NOT EXISTS public.url_analytics (
 
 ---
 
+## 🔐 Google OAuth Setup Guide
+
+To enable "Continue with Google" sign-in, configure both **Google Cloud Console** and **Supabase Dashboard**:
+
+### 1. Google Cloud Console Setup
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create or select your project.
+2. Navigate to **APIs & Services > OAuth consent screen**:
+   - Choose **External** and fill in required fields (App Name, User Support Email, Developer Email).
+   - If your app status is **Testing**, go to the **Test users** tab and add your personal Google email address.
+3. Navigate to **APIs & Services > Credentials**:
+   - Click **Create Credentials > OAuth Client ID**.
+   - Application Type: **Web application**.
+   - **Authorized JavaScript origins**:
+     - `https://<YOUR-PROJECT-REF>.supabase.co`
+   - **Authorized redirect URIs**:
+     - `https://<YOUR-PROJECT-REF>.supabase.co/auth/v1/callback`
+   - Click **Create** and copy the **Client ID** and **Client Secret**.
+
+### 2. Supabase Dashboard Setup
+1. Open your [Supabase Dashboard](https://supabase.com/dashboard).
+2. Go to **Authentication > Providers > Google**:
+   - Toggle **Enable Google provider** to **ON**.
+   - Paste your **Client ID** and **Client Secret** obtained from Google Cloud Console.
+   - Click **Save**.
+3. Go to **Authentication > URL Configuration**:
+   - Set **Site URL** to `http://localhost:5173` (or your production deployment domain).
+   - In **Redirect URLs**, add:
+     - `http://localhost:5173/**`
+     - `http://localhost:3000/**`
+     - `https://your-domain.vercel.app/**` (production)
+   - Click **Save**.
+
+### 3. Common Troubleshooting Steps
+- **`DNS_PROBE_FINISHED_NXDOMAIN` / Failed to fetch**:
+  Free-tier Supabase projects automatically pause after 7 days of inactivity. Go to your Supabase Dashboard and click **"Restore project" / "Unpause"**, or update `.env` if you have a new project URL.
+- **`Unsupported provider: provider is not enabled`**:
+  You must enable the Google provider in Supabase Dashboard (Authentication > Providers > Google) and click Save.
+- **`redirect_uri_mismatch` (Google Error 400)**:
+  Ensure the Authorized Redirect URI in Google Cloud Console is exactly `https://<YOUR-PROJECT-REF>.supabase.co/auth/v1/callback`.
+- **`Access blocked: 403 access_denied`**:
+  If your Google Cloud app is in "Testing" mode, only accounts listed under **Test users** in the OAuth Consent Screen can sign in. Add your email address or publish the app.
+
+---
+
 ## 📜 License
 
 MIT License © 2026 Cutter SaaS Inc.
